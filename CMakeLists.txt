@@ -51,7 +51,7 @@ if(NOT CPU_MINING_ONLY)
     
     find_library(OPENCL_LIBRARY OpenCL)
     
-    find_path(OPENCL_INCLUDE_DIR cl.h)
+    find_path(OPENCL_INCLUDE_DIR NAMES cl.h PATH_SUFFIXES CL)
     
     mark_as_advanced(OPENCL_INCLUDE_DIR OPENCL_LIBRARY)
     

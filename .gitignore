@@ -9,6 +9,7 @@
 *.qm
 Makefile
 build
+*.bin
 
 .DS_Store
 

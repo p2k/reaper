@@ -49,7 +49,7 @@ would make Reaper use devices 0 and 2, and leave devices 1 and 3 free. If there
 are no device lines in the config, Reaper will attempt to use all available
 GPUs.
 
-    threads_per_device [number]
+    threads_per_gpu [number]
 
 How many threads serve each GPU. Different types of GPU may benefit from a
 higher or lower number, but 2 is optimal in most cases.
@@ -112,17 +112,17 @@ directory, issue the following commands:
 
     mkdir build
     cd build
-    cmake -D CMAKE_BUILD_TYPE=Release
+    cmake -D CMAKE_BUILD_TYPE=Release ..
     make
 
 If you want to enable the experimental long polling support (only works with
 pools that support it correctly) use this CMake command instead:
 
-    cmake -D CMAKE_BUILD_TYPE=Release -D LONGPOLLING=ON
+    cmake -D CMAKE_BUILD_TYPE=Release -D LONGPOLLING=ON ..
 
 And if you want to disable compiling the OpenCL part, issue this command:
 
-    cmake -D CMAKE_BUILD_TYPE=Release -D CPU_MINING_ONLY=ON
+    cmake -D CMAKE_BUILD_TYPE=Release -D CPU_MINING_ONLY=ON ..
 
 After compiling you can move the resulting `reaper` binary where you want, but
 make sure to take along the `reaper.cl` kernel file as well as the `reaper.conf`
