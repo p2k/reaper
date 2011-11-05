@@ -1,0 +1,14 @@
+
+.*.swp
+*.*~*
+*.bak
+*.rej
+*.orig
+*.o
+*.patch
+*.qm
+Makefile
+build
+
+.DS_Store
+

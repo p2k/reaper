@@ -216,7 +216,7 @@ void* LongPollThread(void* param)
 
 	while(!shutdown_now)
 	{
-		p->app->Parse(curl.GetWork(longpoll_url, 60));
+		p->app->Parse(curl.GetWork(longpoll_url, 60, false));
 	}
 	pthread_exit(NULL);
 	return NULL;
@@ -319,18 +319,20 @@ void App::Main(vector<string> args)
 
 	Parse(curl.GetWork());
 
-	const int work_update_period_ms = 2000;
+	int work_update_period_ms = 2000;
 
-	/*pthread_t longpollthread;
+#ifdef LONGPOLLING
+	pthread_t longpollthread;
 	LongPollThreadParams lp_params;
 	if (longpoll_active)
 	{
 		cout << "Activating long polling." << endl;
-		//work_update_period_ms = 30000;
+		work_update_period_ms = 20000;
 		lp_params.app = this;
 		lp_params.curl = &curl;
-		//pthread_create(&longpollthread, NULL, LongPollThread, &lp_params);
-	}*/
+		pthread_create(&longpollthread, NULL, LongPollThread, &lp_params);
+	}
+#endif
 
 	if (config.GetValue<bool>("enable_graceful_shutdown"))
 	{

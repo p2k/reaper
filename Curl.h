@@ -19,7 +19,7 @@ public:
 	void Init();
 	void Quit();
 
-	string GetWork(string path="", uint timeout = 5);
+	string GetWork(string path="", uint timeout = 5, bool post = true);
 	string SetWork(string work);
 
 	void SetUsername(string username_) { username = username_; }

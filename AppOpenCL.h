@@ -14,15 +14,7 @@ public:
 #include "pthread.h"
 
 #ifndef CPU_MINING_ONLY
-#ifdef __APPLE_CC__
-#include <OpenCL/opencl.h>
-#else
-#ifdef WIN32
-#include "CL/cl.h"
-#else
 #include "cl.h"
-#endif
-#endif
 #endif
 
 #include "Util.h"

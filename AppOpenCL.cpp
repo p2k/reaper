@@ -287,7 +287,7 @@ void OpenCL::Init()
 	vector<cl_device_id> devices;
 	cl_device_id* devicearray = new cl_device_id[numDevices];
 
-	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, numDevices, devicearray, NULL);
+	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devicearray, NULL);
 	if(status != CL_SUCCESS)
 		throw string("Error getting OpenCL device ID list");
 

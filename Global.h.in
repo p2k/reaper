@@ -55,8 +55,8 @@ const uint RUNTIMES_SIZE = 16;
 
 // Defines
 
-#define REAPER_VERSION "v10"
-/* #undef CPU_MINING_ONLY */
-/* #undef LONGPOLLING */
+#define REAPER_VERSION "@REAPER_VERSION@"
+#cmakedefine CPU_MINING_ONLY
+#cmakedefine LONGPOLLING
 
 #endif

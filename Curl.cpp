@@ -84,12 +84,14 @@ size_t HeaderCallback( void *ptr, size_t size, size_t nmemb, void *userdata)
 		longpoll_url = hdr.substr(0x10);
 		longpoll_url = longpoll_url.substr(0, longpoll_url.length()-2);
 		//cout << "Longpoll url -->" << longpoll_url << "<-- " << endl;
-		//longpoll_active = true;
+#ifdef LONGPOLLING
+		longpoll_active = true;
+#endif
 	}
 	return size*nmemb;
 }
 
-string Curl::GetWork(string path, uint timeout)
+string Curl::GetWork(string path, uint timeout, bool post)
 {
 	getworksentdata.clear();
 
@@ -105,14 +107,20 @@ string Curl::GetWork(string path, uint timeout)
 	curl_slist* headerlist = NULL;
 	headerlist = curl_slist_append(headerlist, "Content-Type: application/json");
 	headerlist = curl_slist_append(headerlist, "Accept: application/json");
-	headerlist = curl_slist_append(headerlist, "User-Agent: solidcoin-json-rpc/0.20.0");
-	headerlist = curl_slist_append(headerlist, "Host: 127.0.0.1");
+	headerlist = curl_slist_append(headerlist, "User-Agent: reaper/" REAPER_VERSION);
 
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
 
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);
-
-	curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, "{\"method\":\"sc_getwork\",\"params\":[],\"id\":1}");
+	
+	if (post) {
+		curl_easy_setopt(curl, CURLOPT_POST, 1);
+		curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, "{\"method\":\"sc_getwork\",\"params\":[],\"id\":1}");
+	}
+	else {
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+		curl_easy_setopt(curl, CURLOPT_POST, 0);
+	}
 
 	CURLcode code = curl_easy_perform(curl);
 	if(code != CURLE_OK)
@@ -147,8 +155,7 @@ string Curl::SetWork(string work)
 	curl_slist* headerlist = NULL;
 	headerlist = curl_slist_append(headerlist, "Content-Type: application/json");
 	headerlist = curl_slist_append(headerlist, "Accept: application/json");
-	headerlist = curl_slist_append(headerlist, "User-Agent: solidcoin-json-rpc/0.20.0");
-	headerlist = curl_slist_append(headerlist, "Host: 127.0.0.1");
+	headerlist = curl_slist_append(headerlist, "User-Agent: reaper/" REAPER_VERSION);
 
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
 
