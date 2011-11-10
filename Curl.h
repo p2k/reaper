@@ -10,7 +10,19 @@ private:
 	string password;
 	string host;
 	unsigned short port;
+
+	enum EXEC_TYPE
+	{
+		GETWORK,
+		GETWORK_LP,
+		TESTWORK,
+	};
+
+	string Execute(Curl::EXEC_TYPE type, string work, string path, uint timeout);
+
 public:
+	string proxy;
+
 	Curl() { curl = NULL; }
 	~Curl() {}
 
@@ -19,8 +31,9 @@ public:
 	void Init();
 	void Quit();
 
+	string GetWork_LP(string path="", uint timeout = 60);
 	string GetWork(string path="", uint timeout = 5);
-	string SetWork(string work);
+	string TestWork(string work);
 
 	void SetUsername(string username_) { username = username_; }
 	void SetPassword(string password_) { password = password_; }

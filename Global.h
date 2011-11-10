@@ -1,6 +1,8 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+#include "CMakeConf.h"
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <cstdlib>
@@ -40,14 +42,15 @@ const uint KERNEL_OUTPUT_SIZE = 256;
 const uint WORK_EXPIRE_TIME_SEC = 120;
 const uint SHARE_THREAD_RESTART_THRESHOLD_SEC = 20;
 
-const uint TARGET_RUNTIME_MS = 500;
+const uint TARGET_RUNTIME_MS = 320;
 const uint TARGET_RUNTIME_ALLOWANCE_MS = 25;
 const uint RUNTIMES_SIZE = 16;
+
+const uint CPU_BATCH_SIZE = 1024;
 
 #define foreachgpu() for(vector<_clState>::iterator it = GPUstates.begin(); it != GPUstates.end(); ++it)
 #define foreachcpu() for(vector<Reap_CPU_param>::iterator it = CPUstates.begin(); it != CPUstates.end(); ++it)
 
-#define REAPER_VERSION "v10"
 #if defined(_M_X64) || defined(__x86_64__)
 #define REAPER_PLATFORM "64-bit"
 #else

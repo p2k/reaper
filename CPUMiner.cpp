@@ -7,8 +7,6 @@
 extern pthread_mutex_t current_work_mutex;
 extern Work current_work;
 
-const uint CPU_BATCH_SIZE = 512;
-
 void* Reap_CPU(void* param)
 {
 	Reap_CPU_param* state = (Reap_CPU_param*)param;
@@ -34,11 +32,10 @@ void* Reap_CPU(void* param)
 			tempwork = current_work;
 			pthread_mutex_unlock(&current_work_mutex);
 			memcpy(tempdata, &tempwork.data[0], 128);
-			*(uint*)&tempdata[108] = state->thread_id;
+			*(uint*)&tempdata[100] = state->thread_id;
 		}
 
-		if ((state->hashes&0x1FF) == 0)
-			*(ullint*)&tempdata[76] = tempwork.ntime_at_getwork + (ticker()-tempwork.time)/1000;
+		*(ullint*)&tempdata[76] = tempwork.ntime_at_getwork + (ticker()-tempwork.time)/1000;
 
 		for(uint h=0; h<CPU_BATCH_SIZE; ++h)
 		{
@@ -67,7 +64,7 @@ void* Reap_CPU(void* param)
 					pthread_mutex_unlock(&state->share_mutex);
 				}
 			}
-			++*(ullint*)&tempdata[100];
+			++*(uint*)&tempdata[108];
 		}
 		state->hashes += CPU_BATCH_SIZE;
 	}

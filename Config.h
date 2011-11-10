@@ -50,16 +50,20 @@ private:
 	}
 
 public:
-	void Save();
-	void Load(string filename);
+	//function disabled because of "include" functionality
+	//void Save(string filename);
+	void Load(string filename, vector<string> included_already = vector<string>());
+	void Clear();
 
 	template<typename T>
 	void SetValue(string key, uint index, T val)
 	{
-		if (config[key].size() <= index)
+		if (config[key].size() < index)
 			return;
-		config[key][index] = ToString(val);
-		Save();
+		if (config[key].size() == index)
+			config[key].push_back(ToString(val));
+		else
+			config[key][index] = ToString(val);
 	}
 
 	template<typename T>
@@ -88,8 +92,6 @@ public:
 	{
 		return (uint)config[key].size();
 	}
-	string GetConfigFileName();
-	void SetConfigFileName( string filename );
 };
 extern Config config;
 #endif

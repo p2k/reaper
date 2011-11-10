@@ -91,7 +91,7 @@ void SubmitShare(Curl& curl, vector<uchar>& w)
 	}
 	try 	
 	{ 	
-		string ret = curl.SetWork(VectorToHexString(w));
+		string ret = curl.TestWork(VectorToHexString(w));
 		Json::Value root;
 		Json::Reader reader;
 		bool parse_success = reader.parse(ret, root);
@@ -214,10 +214,45 @@ void* LongPollThread(void* param)
 	curl.SetHost(parent_curl->GetHost());
 	curl.SetPort(parent_curl->GetPort());
 
+	string LP_url = longpoll_url;
+	string LP_path;
+	{//parsing LP address
+		vector<string> exploded = Explode(LP_url, '/');
+		if (exploded.size() >= 2 && exploded[0] == "http:")
+		{
+			vector<string> exploded2 = Explode(exploded[1], ':');
+			if (exploded2.size() != 2)
+				goto couldnt_parse;
+			cout << "LP Host: " << exploded2[0] << endl;
+			curl.SetHost(exploded2[0]);
+			cout << "LP Port: " << exploded2[1] << endl;
+			curl.SetPort(exploded2[1]);
+			if (exploded.size() <= 2)
+				LP_path = '/';
+			else
+				LP_path = "/" + exploded[2];
+			cout << "LP Path: " << LP_path << endl;
+		}
+		else if (LP_url.length() > 0 && LP_url[0] == '/')
+		{
+			LP_path = LP_url;
+			cout << "LP Path: " << LP_path << endl;
+		}
+		else
+		{
+			goto couldnt_parse;
+		}
+	}
+
 	while(!shutdown_now)
 	{
-		p->app->Parse(curl.GetWork(longpoll_url, 60));
+		p->app->Parse(curl.GetWork_LP(LP_path, 60));
 	}
+	pthread_exit(NULL);
+	return NULL;
+
+couldnt_parse:
+	cout << "Couldn't parse long polling URL [" << LP_url << "]. turning LP off." << endl;
 	pthread_exit(NULL);
 	return NULL;
 }
@@ -243,24 +278,36 @@ using std::stringstream;
 
 void App::Main(vector<string> args)
 {
-	cout << "\\||||||||||||||||||||||||||||||||||||||/" << endl;
-	cout << "-  Reaper " << REAPER_VERSION << " " << REAPER_PLATFORM << ", coded by mtrlt   -" << endl;
-	cout << "-    Donations are welcome! Thanks!    -" << endl;
-	cout << "-  sPuLn5UqBWMBdZF4JVx9GGfFiX55rpKQwR  -" << endl;
-	cout << "/||||||||||||||||||||||||||||||||||||||\\" << endl;
+	cout << "\\|||||||||||||||||||||/" << endl;
+	cout << "-  Reaper " << REAPER_VERSION << " " << REAPER_PLATFORM << "  -" << endl;
+	cout << "-   coded by mtrlt    -" << endl;
+	cout << "/|||||||||||||||||||||\\" << endl;
 	cout << endl;
-	if (args.size() < 5)
-	{
-		cout << "Syntax: " << args[0] << " host port user pass [config_filename]" << endl;
-		return;
-	}
 	string config_name = "reaper.conf";
-	if (args.size() >= 6)
+	bool old_args = false;
+	if (args.size() < 5) // new arg format
 	{
-		config_name = args[5];
+		if (args.size() >= 2)
+			config_name = args[1];
+	}
+	else //old arg format
+	{
+		if (args.size() >= 6)
+		{
+			config_name = args[5];
+		}
+		old_args = true;
 	}
 	getworks = 0;
 	config.Load(config_name);
+	if (!old_args)
+	{
+		if (config.GetValue<string>("host") == "" ||
+			config.GetValue<string>("port") == "" ||
+			config.GetValue<string>("user") == "" ||
+			config.GetValue<string>("pass") == "")
+			throw string("The config is missing one of host/port/user/pass.");
+	}
 	globalconfs.local_worksize = config.GetValue<uint>("worksize");
 	{
 		if (config.GetValue<string>("aggression") == "max")
@@ -292,6 +339,7 @@ void App::Main(vector<string> args)
 #endif
 	if (globalconfs.cputhreads == 0 && globalconfs.threads_per_gpu == 0)
 	{
+		throw string("No CPU or GPU mining threads.. please set either cpu_mining_threads or threads_per_gpu to something other than 0.");
 	}
 	globalconfs.platform = config.GetValue<uint>("platform");
 
@@ -306,10 +354,21 @@ void App::Main(vector<string> args)
 
 	Curl::GlobalInit();
 	curl.Init();
-	curl.SetHost(args[1]);
-	curl.SetPort(args[2]);
-	curl.SetUsername(args[3]);
-	curl.SetPassword(args[4]);
+	if (old_args)
+	{
+		curl.SetHost(args[1]);
+		curl.SetPort(args[2]);
+		curl.SetUsername(args[3]);
+		curl.SetPassword(args[4]);
+	}
+	else
+	{
+		curl.SetHost(config.GetValue<string>("host"));
+		curl.SetPort(config.GetValue<string>("port"));
+		curl.SetUsername(config.GetValue<string>("user"));
+		curl.SetPassword(config.GetValue<string>("pass"));
+	}
+	curl.proxy = config.GetValue<string>("proxy");
 
 	pthread_t sharethread;
 	pthread_create(&sharethread, NULL, ShareThread, &curl);
@@ -319,18 +378,18 @@ void App::Main(vector<string> args)
 
 	Parse(curl.GetWork());
 
-	const int work_update_period_ms = 2000;
 
-	/*pthread_t longpollthread;
+	const int work_update_period_ms = 20000;
+
+	pthread_t longpollthread;
 	LongPollThreadParams lp_params;
-	if (longpoll_active)
+	if (config.GetValue<bool>("long_polling") && longpoll_active)
 	{
 		cout << "Activating long polling." << endl;
-		//work_update_period_ms = 30000;
 		lp_params.app = this;
 		lp_params.curl = &curl;
-		//pthread_create(&longpollthread, NULL, LongPollThread, &lp_params);
-	}*/
+		pthread_create(&longpollthread, NULL, LongPollThread, &lp_params);
+	}
 
 	if (config.GetValue<bool>("enable_graceful_shutdown"))
 	{
@@ -423,7 +482,7 @@ void App::Parse(string data)
 	workupdate = ticker();
 	if (data == "")
 	{
-		cout << humantime() << "Couldn't connect to pool. Trying again in a few seconds... " << endl;
+		cout << humantime() << "Couldn't connect to server. Trying again in a few seconds... " << endl;
 		return;
 	}
 	Json::Value root, result, error;
@@ -478,6 +537,6 @@ void App::Parse(string data)
 		cout << humantime() << "Code " << error["code"].asInt() << ", \"" << error["message"].asString() << "\"" << endl;
 	}
 got_error:
-	cout << humantime() << "Error with pool: " << data << endl;
+	cout << humantime() << "Error with server: " << data << endl;
 	return;
 }
