@@ -57,10 +57,4 @@ const uint CPU_BATCH_SIZE = 1024;
 #define REAPER_PLATFORM "32-bit"
 #endif
 
-// Defines
-
-#define REAPER_VERSION "v10"
-/* #undef CPU_MINING_ONLY */
-/* #undef LONGPOLLING */
-
 #endif
