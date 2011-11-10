@@ -31,7 +31,7 @@ set(SOURCES
     json_writer.cpp
     main.cpp
     RSHash.cpp
-	ServerSettings.cpp
+    ServerSettings.cpp
     SHA256.cpp
     Util.cpp
 )
