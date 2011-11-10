@@ -1,6 +1,7 @@
-#include <string.h>
-#include <stdio.h>
-#include <stdint.h>
+#include "Global.h"
+#include <cstring>
+#include <cstdio>
+#include <cstdint>
 
 #include <iostream>
 using std::cout;

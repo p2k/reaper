@@ -61,12 +61,11 @@ void* Reap_GPU(void* param)
 
 	Work tempwork;
 
-	uchar tempdata[512];
-	memset(tempdata, 0, 512);
+	uchar tempdata[1024];
+	memset(tempdata, 0, 1024);
 
 	clEnqueueWriteBuffer(state->commandQueue, state->CLbuffer[0], true, 0, KERNEL_INPUT_SIZE, tempdata, 0, NULL, NULL);
 	clEnqueueWriteBuffer(state->commandQueue, state->CLbuffer[1], true, 0, KERNEL_OUTPUT_SIZE*sizeof(uint), tempdata, 0, NULL, NULL);
-	clEnqueueWriteBuffer(state->commandQueue, state->padbuffer32, true, 0, 1024*1024*4*sizeof(uint), BlockHash_1_MemoryPAD32, 0, NULL, NULL);
 
 	uint kernel_output[KERNEL_OUTPUT_SIZE] = {};
 
@@ -74,13 +73,10 @@ void* Reap_GPU(void* param)
 	bool write_kernel_input = true;
 
 	size_t base = 0;
-	
 	clSetKernelArg(state->kernel, 2, sizeof(cl_mem), &state->padbuffer32);
 
 	bool errorfree = true;
-
 	deque<uint> runtimes;
-
 	while(!shutdown_now)
 	{
 		if (globalconfs.max_aggression && !runtimes.empty())
@@ -403,7 +399,7 @@ void OpenCL::Init()
 
 		if (filebinary == NULL)
 		{
-			cout << "Compiling kernel.." << endl;
+			cout << "Compiling kernel... this could take up to 2 minutes." << endl;
 			GPUstate.program = clCreateProgramWithSource(clState.context, 1, (const char **)&see, &sourcesizes[0], &status);
 			if(status != CL_SUCCESS) 
 				throw string("Error creating OpenCL program from source");
@@ -478,15 +474,20 @@ void OpenCL::Init()
 			cout << "Kernel build not successful: " << status << endl;
 			throw string("Error creating OpenCL kernel");
 		}
+		cl_mem padbuffer32 = clCreateBuffer(clState.context, CL_MEM_READ_ONLY, 1024*1024*4*sizeof(uint), NULL, &status);
 		for(uint thread_id = 0; thread_id < globalconfs.threads_per_gpu; ++thread_id)
 		{
 			GPUstate.commandQueue = clCreateCommandQueue(clState.context, devices[device_id], 0, &status);
+			if (thread_id == 0)
+			{
+				clEnqueueWriteBuffer(GPUstate.commandQueue, padbuffer32, true, 0, 1024*1024*4*sizeof(uint), BlockHash_1_MemoryPAD32, 0, NULL, NULL);
+			}
 			if(status != CL_SUCCESS)
 				throw string("Error creating OpenCL command queue");
 
 			GPUstate.CLbuffer[0] = clCreateBuffer(clState.context, CL_MEM_READ_ONLY, KERNEL_INPUT_SIZE, NULL, &status);
 			GPUstate.CLbuffer[1] = clCreateBuffer(clState.context, CL_MEM_WRITE_ONLY, KERNEL_OUTPUT_SIZE*sizeof(uint), NULL, &status);
-			GPUstate.padbuffer32 = clCreateBuffer(clState.context, CL_MEM_READ_ONLY, 1024*1024*4*sizeof(uint), NULL, &status);
+			GPUstate.padbuffer32 = padbuffer32;
 
 			if(status != CL_SUCCESS)
 			{

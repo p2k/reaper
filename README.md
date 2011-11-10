@@ -92,8 +92,7 @@ Recommended value: yes
 
     platform [number]
 
-Select which GPU code platform to use. At the moment Reaper only supports
-OpenCL, which is 0.
+Select which OpenCL platform to use. For example the AMD one is called "AMD Accelerated Parallel Processing". The NVIDIA one is "CUDA something". Usually platform number 0 is the one you want.
 
 Recommended value: 0
 
@@ -104,23 +103,49 @@ can press "Q" then "Enter" to shut down Reaper gracefully.
 
 Recommended value: yes
 
+In v11, the following options were added:
+
+	long_polling [yes/no]
+	
+Whether to enable the experimental long polling support.
+
+Recommended value: yes
+
+	host [address]
+	port [number]
+	user [text]
+	pass [text]
+	
+You can now configure the server's info in the config file instead of having
+to use command line arguments.
+
+	proxy [address]
+
+Proxy information such as:
+socks4://user:pass@proxyaddr:port
+
+	include [filename]
+
+Loads a config file and its settings.
+
+#can put the host/port/user/pass info to the config instead
+#proxy settings
+#include directive in config
+
+
 Compiling
 ---------
 
-Reaper is compiled using [CMake](http://www.cmake.org/). In the reaper
-directory, issue the following commands:
+Reaper is compiled using [CMake](http://www.cmake.org/). If you're on Windows,
+you can use the supplied cmake-win.cmd batch file. Otherwise, issue the
+following commands in the reaper directory:
 
     mkdir build
     cd build
     cmake -D CMAKE_BUILD_TYPE=Release ..
     make
 
-If you want to enable the experimental long polling support (only works with
-pools that support it correctly) use this CMake command instead:
-
-    cmake -D CMAKE_BUILD_TYPE=Release -D LONGPOLLING=ON ..
-
-And if you want to disable compiling the OpenCL part, issue this command:
+If you want to disable compiling the OpenCL part, issue this command:
 
     cmake -D CMAKE_BUILD_TYPE=Release -D CPU_MINING_ONLY=ON ..
 

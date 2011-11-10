@@ -1,3 +1,4 @@
+#include "Global.h"
 #include "RSHash.h"
 #include "Blake512.h"
 #include "SHA256.h"

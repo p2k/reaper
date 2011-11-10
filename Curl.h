@@ -10,13 +10,19 @@ private:
 	string password;
 	string host;
 	unsigned short port;
-	string getworksentdata;
-	string setworksentdata;
-	
-	friend size_t GetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
-	friend size_t SetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
-	
+
+	enum EXEC_TYPE
+	{
+		GETWORK,
+		GETWORK_LP,
+		TESTWORK,
+	};
+
+	string Execute(Curl::EXEC_TYPE type, string work, string path, uint timeout);
+
 public:
+	string proxy;
+
 	Curl() { curl = NULL; }
 	~Curl() {}
 
@@ -25,8 +31,9 @@ public:
 	void Init();
 	void Quit();
 
-	string GetWork(string path="", uint timeout = 5, bool post = true);
-	string SetWork(string work);
+	string GetWork_LP(string path="", uint timeout = 60);
+	string GetWork(string path="", uint timeout = 5);
+	string TestWork(string work);
 
 	void SetUsername(string username_) { username = username_; }
 	void SetPassword(string password_) { password = password_; }

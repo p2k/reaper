@@ -30,34 +30,18 @@ void Curl::Quit()
 	curl_global_cleanup();
 }
 
-size_t GetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata)
+size_t ResponseCallback(void *ptr, size_t size, size_t nmemb, void *data)
 {
 	size_t bytes = size * nmemb;
-	Curl *curlInstance = (Curl *)userdata;
+	string* getworksentdata = (string*)data;
 	try
 	{
 		std::string sentdata((char *)ptr, bytes);
-		curlInstance->getworksentdata += sentdata;
+		getworksentdata->append(sentdata);
 	}
 	catch(std::exception s)
 	{
 		cout << "(1) Error: " << s.what() << endl;
-	}
-	return bytes;
-}
-
-size_t SetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata)
-{
-	size_t bytes = size * nmemb;
-	Curl *curlInstance = (Curl *)userdata;
-	try	
-	{
-		std::string sentdata((char *)ptr, bytes);
-		curlInstance->setworksentdata += sentdata;
-	}
-	catch(std::exception s)
-	{
-		cout << "(2) Error: " << s.what() << endl;
 	}
 	return bytes;
 }
@@ -71,25 +55,41 @@ size_t HeaderCallback( void *ptr, size_t size, size_t nmemb, void *userdata)
 		Curl::longpoll_url = hdr.substr(0x10);
 		Curl::longpoll_url = Curl::longpoll_url.substr(0, Curl::longpoll_url.length()-2);
 		//cout << "Longpoll url -->" << Curl::longpoll_url << "<-- " << endl;
-#ifdef LONGPOLLING
 		Curl::longpoll_active = true;
-#endif
 	}
 	return bytes;
 }
 
-string Curl::GetWork(string path, uint timeout, bool post)
+string Curl::GetWork_LP(string path, uint timeout)
 {
-	getworksentdata.clear();
+	return Execute(GETWORK_LP, "", path, timeout);
+}
+
+string Curl::GetWork(string path, uint timeout)
+{
+	return Execute(GETWORK, "", path, timeout);
+}
+
+string Curl::TestWork(string work)
+{
+	return Execute(TESTWORK, work, "", 1);
+}
+
+string Curl::Execute(Curl::EXEC_TYPE type, string work, string path, uint timeout)
+{
+	string responsedata;
 
 	curl_easy_setopt(curl, CURLOPT_URL, ("http://" + host + path).c_str());
 	curl_easy_setopt(curl, CURLOPT_USERPWD, (username + ":" + password).c_str());
 	curl_easy_setopt(curl, CURLOPT_PORT, port);
 
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, GetWorkWriteMemoryCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseCallback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responsedata);
 
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
+
+	if (proxy != "")
+		curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
 
 	curl_slist* headerlist = NULL;
 	headerlist = curl_slist_append(headerlist, "Content-Type: application/json");
@@ -100,13 +100,24 @@ string Curl::GetWork(string path, uint timeout, bool post)
 
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);
 	
-	if (post) {
+	if (type == GETWORK_LP) 
+	{
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
+		curl_easy_setopt(curl, CURLOPT_POST, 0);
+	}
+	else if (type == GETWORK)
+	{
 		curl_easy_setopt(curl, CURLOPT_POST, 1);
 		curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, "{\"method\":\"sc_getwork\",\"params\":[],\"id\":1}");
 	}
-	else {
-		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
-		curl_easy_setopt(curl, CURLOPT_POST, 0);
+	else if (type == TESTWORK)
+	{
+		curl_easy_setopt(curl, CURLOPT_POST, 1);
+		curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, ("{\"method\":\"sc_testwork\",\"id\":\"1\",\"params\":[\"" + work + "\"]}").c_str());
+	}
+	else
+	{
+		cout << "ERMYYR" << endl;
 	}
 
 	CURLcode code = curl_easy_perform(curl);
@@ -120,48 +131,9 @@ string Curl::GetWork(string path, uint timeout, bool post)
 		{
 			cout << humantime() << "Error " << code << " getting work. See http://curl.haxx.se/libcurl/c/libcurl-errors.html for error code explanations." << endl;
 		}
-		return string("");
 	}
 	curl_slist_free_all(headerlist);
-	return getworksentdata;
-}
-
-string Curl::SetWork(string work)
-{
-	setworksentdata.clear();
-
-	curl_easy_setopt(curl, CURLOPT_URL, ("http://" + host).c_str());
-	curl_easy_setopt(curl, CURLOPT_USERPWD, (username + ":" + password).c_str());
-	curl_easy_setopt(curl, CURLOPT_PORT, port);
-
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, SetWorkWriteMemoryCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
-
-	curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, ("{\"method\":\"sc_testwork\",\"id\":\"1\",\"params\":[\"" + work + "\"]}").c_str());
-
-	curl_slist* headerlist = NULL;
-	headerlist = curl_slist_append(headerlist, "Content-Type: application/json");
-	headerlist = curl_slist_append(headerlist, "Accept: application/json");
-	headerlist = curl_slist_append(headerlist, "User-Agent: reaper/" REAPER_VERSION);
-
-	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
-
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1);
-
-	CURLcode code = curl_easy_perform(curl);
-	if(code != CURLE_OK)
-	{
-		if (code == CURLE_COULDNT_CONNECT)
-		{
-			cout << humantime() << "Could not connect. Server down?" << endl;
-		}
-		else
-		{
-			cout << humantime() << "Error " << code << " submitting work. See http://curl.haxx.se/libcurl/c/libcurl-errors.html for error code explanations." << endl;
-		}
-	}
-	curl_slist_free_all(headerlist);
-	return setworksentdata;
+	return responsedata;
 }
 
 #undef SetPort

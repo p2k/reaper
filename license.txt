@@ -1,4 +1,4 @@
-Reaper, a SolidCoin 2 GPU miner.
+Reaper, a SolidCoin 2 CPU & GPU miner.
 Copyright (C) 2011 mtrlt
 
 This program is free software: you can redistribute it and/or modify

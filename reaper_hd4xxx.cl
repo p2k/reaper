@@ -4,16 +4,16 @@ typedef uint u32;
 typedef ulong u64;
 
 //u8 that might be uchar or uchar2 depending on the kernel
-typedef uchar u8_v;
+typedef uchar2 u8_v;
 
 #define U8TO32(p) \
-  (((u32)((p)[0]) << 24) | ((u32)((p)[1]) << 16) | \
-   ((u32)((p)[2]) <<  8) | ((u32)((p)[3])      ))
+  (((u32)((p)[0].x) << 24) | ((u32)((p)[1].x) << 16) | \
+   ((u32)((p)[2].x) <<  8) | ((u32)((p)[3].x)      ))
 #define U8TO64(p) \
   (((u64)U8TO32(p) << 32) | (u64)U8TO32((p) + 4))
 #define U32TO8(p, v) \
-    (p)[0] = (u8)((v) >> 24); (p)[1] = (u8)((v) >> 16); \
-    (p)[2] = (u8)((v) >>  8); (p)[3] = (u8)((v)      ); 
+    (p)[0].x = (u8)((v) >> 24); (p)[1].x = (u8)((v) >> 16); \
+    (p)[2].x = (u8)((v) >>  8); (p)[3].x = (u8)((v)      ); 
 #define U64TO8(p, v) \
     U32TO8((p),     (u32)((v) >> 32));	\
     U32TO8((p) + 4, (u32)((v)      )); 
@@ -84,10 +84,9 @@ void Sha256_round(u32* s, u8_v* data)
 {
 	u32 work[64];
 
-	u32* udata = (u32*)data;
 	for(u32 i=0; i<16; ++i)
 	{
-		work[i] = EndianSwap(udata[i]);
+		work[i] = U8TO32(data+i*4);
 	}
 
 	u32 A = s[0];
@@ -214,7 +213,7 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	u8_v in[512];
 #pragma unroll
 	for(uint i=0; i<128; ++i)
-		in[i] = in_param[i];
+		in[i].x = in_param[i];
 		
 	uint nonce = get_global_id(0);
 	
@@ -290,63 +289,56 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	
 	u8_v* work3 = work2+64;
 //a = x-1, b = x, c = x&63
-#define WORKINIT(a,b,c)   work3[a] ^= work2[c]; \
-		if(work3[a]&0x80) work3[b]=in[(b+work3[a])&0x7F]; \
-		else              work3[b]=work2[(b+work3[a])&0x3F];
+#define WORKINIT(a,b,c)   work3[a].x ^= work2[c].x; \
+		if(work3[a].x&0x80) work3[b].x=in[(b+work3[a].x)&0x7F].x; \
+		else              work3[b].x=work2[(b+work3[a].x)&0x3F].x;
 
 
-	work3[0] = work2[15];
-#pragma unroll
+	work3[0].x = work2[15].x;
 	for(uint x=1;x<320;++x)
 	{
 		WORKINIT(x-1,x,x&63);
 	}
 
-	#define READ_W32(offset) ((u32)work3[offset] + (((u32)work3[(offset)+1])<<8) + (((u32)work3[(offset)+2]&0x3F)<<16))
+	#define READ_W32(offset) ((u32)work3[offset].x + (((u32)work3[(offset)+1].x)<<8) + (((u32)work3[(offset)+2].x&0x3F)<<16))
 	#define PAD_MASK 0x3FFFFF
 
-	u16* shortptr = (u16*)(work3+310);
-	u64 qCount = shortptr[0];
-	qCount |= ((u64)shortptr[3])<<48;
-	u32* uintptr = (u32*)(work3+312);
-	qCount |= ((u64)*uintptr)<<16;
+	u64 qCount =((u64)(work3[310].x))     +
+				((u64)(work3[311].x)<<8)  +
+				((u64)(work3[312].x)<<16) +
+ 				((u64)(work3[313].x)<<24) +
+                ((u64)(work3[314].x)<<32) +
+				((u64)(work3[315].x)<<40) +
+				((u64)(work3[316].x)<<48) +
+				((u64)(work3[317].x)<<56);
 
-	u32 nExtra=(((u8)pad32[(qCount+work3[300])&PAD_MASK])>>3)+512;
+
+	u32 nExtra=(((u8)pad32[(qCount+work3[300].x)&PAD_MASK])>>3)+512;
 	for(u32 x=1;x<nExtra;++x)
 	{
 		qCount += pad32[qCount&PAD_MASK];
 		
 		if(qCount&0x87878700)        
-			++work3[qCount%320];
+			++work3[qCount%320].x;
 		
-		qCount -= (u8)pad32[(qCount+work3[qCount%160])&PAD_MASK];
+		qCount -= (u8)pad32[(qCount+work3[qCount%160].x)&PAD_MASK];
 	
 		if (qCount&0x80000000)
 			qCount += (u8)pad32[qCount&0xFFFF];
 		else
 			qCount += pad32[qCount&0x20FAFB];
 		
-		qCount += pad32[(qCount+work3[qCount%160])&PAD_MASK];
+		qCount += pad32[(qCount+work3[qCount%160].x)&PAD_MASK];
 		if (qCount&0xF0000000) 
-			++work3[qCount%320];
+			++work3[qCount%320].x;
 
 		qCount += pad32[READ_W32((u8)qCount)];
-		work3[x%320]=work2[x&63]^((u8)qCount);
-		qCount += pad32[((qCount>>32)+work3[x%200])&PAD_MASK];
-		//this is an ingenious^3 optimization that replaced the previous ingenious one.
-		//this one actually gives like +25% speed. twenty-five percent. dammit.
-		u64 val = ((qCount>>24)&0xFFFFFFFFUL) << ((qCount&3)*8);
-		u32 qCof = (qCount%316)&0x1FC;
-		if (qCof&4)
-		{
-			*(u32*)(work3+qCof) ^= val;
-			*(u32*)(work3+qCof+4) ^= val>>32;
-		}
-		else
-		{
-			*(u64*)(work3+qCof) ^= val;
-		}
-
+		work3[x%320].x=work2[x&63].x^((u8)qCount);
+		qCount += pad32[((qCount>>32)+work3[x%200].x)&PAD_MASK];
+		work3[qCount%316].x     ^= (qCount>>24)&0xFF;
+		work3[(qCount%316)+1].x ^= (qCount>>32)&0xFF;
+		work3[(qCount%316)+2].x ^= (qCount>>40)&0xFF;
+		work3[(qCount%316)+3].x ^= (qCount>>48)&0xFF;
 		if ((qCount&7) == 3) ++x;
 		qCount -= (u8)pad32[x*x];
 		if ((qCount&7) == 1) ++x;

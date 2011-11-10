@@ -12,8 +12,8 @@ typedef uchar u8_v;
 #define U8TO64(p) \
   (((u64)U8TO32(p) << 32) | (u64)U8TO32((p) + 4))
 #define U32TO8(p, v) \
-    (p)[0] = (u8)((v) >> 24); (p)[1] = (u8)((v) >> 16); \
-    (p)[2] = (u8)((v) >>  8); (p)[3] = (u8)((v)      ); 
+    (p)[0] = (u8_v)((v) >> 24); (p)[1] = (u8_v)((v) >> 16); \
+    (p)[2] = (u8_v)((v) >>  8); (p)[3] = (u8_v)((v)      ); 
 #define U64TO8(p, v) \
     U32TO8((p),     (u32)((v) >> 32));	\
     U32TO8((p) + 4, (u32)((v)      )); 
@@ -333,21 +333,18 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 		qCount += pad32[READ_W32((u8)qCount)];
 		work3[x%320]=work2[x&63]^((u8)qCount);
 		qCount += pad32[((qCount>>32)+work3[x%200])&PAD_MASK];
-		//this is an ingenious^3 optimization that replaced the previous ingenious one.
-		//this one actually gives like +25% speed. twenty-five percent. dammit.
-		u64 val = ((qCount>>24)&0xFFFFFFFFUL) << ((qCount&3)*8);
-		u32 qCof = (qCount%316)&0x1FC;
-		if (qCof&4)
+		//this is an ingenious optimization. gives +2.5% :-)
+		if (qCount&3)
 		{
-			*(u32*)(work3+qCof) ^= val;
-			*(u32*)(work3+qCof+4) ^= val>>32;
+			u8* ram = work3+(qCount%316);
+			ram[0] ^= (u8)(qCount>>24);
+			ram[1] ^= (u8)(qCount>>32);
+			ram[2] ^= (u8)(qCount>>40);
+			ram[3] ^= (u8)(qCount>>48);
+			if ((qCount&7) == 3) ++x;
 		}
 		else
-		{
-			*(u64*)(work3+qCof) ^= val;
-		}
-
-		if ((qCount&7) == 3) ++x;
+			*(uint*)(work3+qCount%316) ^= qCount>>24;
 		qCount -= (u8)pad32[x*x];
 		if ((qCount&7) == 1) ++x;
 	}

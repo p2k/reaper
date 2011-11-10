@@ -56,4 +56,6 @@ struct Work
 	ullint ntime_at_getwork;
 };
 
+vector<string> Explode(string str, char delim);
+
 #endif

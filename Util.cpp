@@ -84,3 +84,27 @@ void Wait_ms(uint n)
 	nanosleep(&ts, NULL);
 }
 #endif
+
+vector<string> Explode(string s, char delim)
+{
+	vector<string> returner;
+	returner.clear();
+	if (s.length() == 0)
+		return returner;
+	string temp;
+	for(uint i=0; i<s.length(); ++i)
+	{
+		if (s[i] == delim)
+		{
+			if (temp.size() > 0)
+				returner.push_back(temp);
+			temp.clear();
+		}
+		else
+		{
+			temp.push_back(s[i]);
+		}
+	}
+	returner.push_back(temp);
+	return returner;
+}
