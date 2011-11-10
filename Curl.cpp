@@ -4,6 +4,9 @@
 #include "curl/curl.h"
 #include "Util.h"
 
+string Curl::longpoll_url;
+bool Curl::longpoll_active = false;
+
 void Curl::GlobalInit()
 {
 	curl_global_init(CURL_GLOBAL_ALL);
@@ -27,68 +30,52 @@ void Curl::Quit()
 	curl_global_cleanup();
 }
 
-string getworksentdata;
-size_t GetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *data)
+size_t GetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	try 	
-	{ 	
-		for(uint i=0; i<size*nmemb; ++i) 	
-		{ 		
-			if(ptr!=NULL) 		
-			{ 			
-				char c = ((char*)ptr)[i]; 			
-				getworksentdata.push_back(c); 		
-			} 	
-		}
-	} 	
-	catch(std::exception s) 	
-	{ 		
-		cout << "(1) Error: " << s.what() << endl; 	
+	size_t bytes = size * nmemb;
+	Curl *curlInstance = (Curl *)userdata;
+	try
+	{
+		std::string sentdata((char *)ptr, bytes);
+		curlInstance->getworksentdata += sentdata;
 	}
-	return size*nmemb; 
+	catch(std::exception s)
+	{
+		cout << "(1) Error: " << s.what() << endl;
+	}
+	return bytes;
 }
 
-string setworksentdata;
-size_t SetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *data)
+size_t SetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	try 	
-	{ 	
-		for(uint i=0; i<size*nmemb; ++i) 	
-		{ 		
-			if(ptr!=NULL) 		
-			{ 			
-				char c = ((char*)ptr)[i]; 			
-				setworksentdata.push_back(c); 		
-			} 	
-		}
-	} 	
-	catch(std::exception s) 	
-	{ 		
-		cout << "(2) Error: " << s.what() << endl; 	
+	size_t bytes = size * nmemb;
+	Curl *curlInstance = (Curl *)userdata;
+	try	
+	{
+		std::string sentdata((char *)ptr, bytes);
+		curlInstance->setworksentdata += sentdata;
 	}
-	return size*nmemb; 
+	catch(std::exception s)
+	{
+		cout << "(2) Error: " << s.what() << endl;
+	}
+	return bytes;
 }
 
-string longpoll_url;
-bool longpoll_active=false;
 size_t HeaderCallback( void *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	string hdr;
-	for(uint i=0; i<size*nmemb; ++i)
+	size_t bytes = size * nmemb;
+	std::string hdr((char *)ptr, bytes);
+	if (!Curl::longpoll_active && hdr.length() >= 0x10 && hdr.substr(0,0xF) == "X-Long-Polling:")
 	{
-		char c = ((char*)ptr)[i];
-		hdr.push_back(c);
-	}
-	if (!longpoll_active && hdr.length() >= 0x10 && hdr.substr(0,0xF) == "X-Long-Polling:")
-	{
-		longpoll_url = hdr.substr(0x10);
-		longpoll_url = longpoll_url.substr(0, longpoll_url.length()-2);
-		//cout << "Longpoll url -->" << longpoll_url << "<-- " << endl;
+		Curl::longpoll_url = hdr.substr(0x10);
+		Curl::longpoll_url = Curl::longpoll_url.substr(0, Curl::longpoll_url.length()-2);
+		//cout << "Longpoll url -->" << Curl::longpoll_url << "<-- " << endl;
 #ifdef LONGPOLLING
-		longpoll_active = true;
+		Curl::longpoll_active = true;
 #endif
 	}
-	return size*nmemb;
+	return bytes;
 }
 
 string Curl::GetWork(string path, uint timeout, bool post)
@@ -100,7 +87,7 @@ string Curl::GetWork(string path, uint timeout, bool post)
 	curl_easy_setopt(curl, CURLOPT_PORT, port);
 
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, GetWorkWriteMemoryCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
 
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
 
@@ -148,7 +135,7 @@ string Curl::SetWork(string work)
 	curl_easy_setopt(curl, CURLOPT_PORT, port);
 
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, SetWorkWriteMemoryCallback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
 
 	curl_easy_setopt(curl, CURLOPT_COPYPOSTFIELDS, ("{\"method\":\"sc_testwork\",\"id\":\"1\",\"params\":[\"" + work + "\"]}").c_str());
 

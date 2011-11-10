@@ -10,6 +10,12 @@ private:
 	string password;
 	string host;
 	unsigned short port;
+	string getworksentdata;
+	string setworksentdata;
+	
+	friend size_t GetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
+	friend size_t SetWorkWriteMemoryCallback(void *ptr, size_t size, size_t nmemb, void *userdata);
+	
 public:
 	Curl() { curl = NULL; }
 	~Curl() {}
@@ -31,6 +37,9 @@ public:
 	string GetPassword() { return password; }
 	string GetHost() { return host; }
 	string GetPort();
+	
+	static string longpoll_url;
+	static bool longpoll_active;
 };
 
 #endif

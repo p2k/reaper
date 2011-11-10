@@ -190,9 +190,6 @@ void* ShareThread(void* param)
 	return NULL;
 }
 
-extern string longpoll_url;
-extern bool longpoll_active;
-
 struct LongPollThreadParams
 {
 	Curl* curl;
@@ -216,7 +213,7 @@ void* LongPollThread(void* param)
 
 	while(!shutdown_now)
 	{
-		p->app->Parse(curl.GetWork(longpoll_url, 60, false));
+		p->app->Parse(curl.GetWork(Curl::longpoll_url, 60, false));
 	}
 	pthread_exit(NULL);
 	return NULL;
@@ -324,7 +321,7 @@ void App::Main(vector<string> args)
 #ifdef LONGPOLLING
 	pthread_t longpollthread;
 	LongPollThreadParams lp_params;
-	if (longpoll_active)
+	if (Curl::longpoll_active)
 	{
 		cout << "Activating long polling." << endl;
 		work_update_period_ms = 20000;
