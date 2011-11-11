@@ -79,7 +79,7 @@ clock_t ticker()
 void Wait_ms(uint n)
 {
 	timespec ts;
-	ts.tv_sec = 0;
+	ts.tv_sec = n/1000;
 	ts.tv_nsec = n*1000000;
 	nanosleep(&ts, NULL);
 }

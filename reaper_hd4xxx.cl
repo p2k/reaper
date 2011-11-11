@@ -13,14 +13,14 @@ typedef uchar2 u8_v;
   (((u64)U8TO32(p) << 32) | (u64)U8TO32((p) + 4))
 #define U32TO8(p, v) \
     (p)[0].x = (u8)((v) >> 24); (p)[1].x = (u8)((v) >> 16); \
-    (p)[2].x = (u8)((v) >>  8); (p)[3].x = (u8)((v)      ); 
+    (p)[2].x = (u8)((v) >>  8); (p)[3].x = (u8)((v)      );
 #define U64TO8(p, v) \
     U32TO8((p),     (u32)((v) >> 32));	\
-    U32TO8((p) + 4, (u32)((v)      )); 
+    U32TO8((p) + 4, (u32)((v)      ));
 
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
+//#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
 
-__constant u8 sigma[256] = 
+__constant u8 sigma[256] =
 {
      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15 ,
     14,10, 4, 8, 9,15,13, 6, 1,12, 0, 2,11, 7, 5, 3 ,
@@ -37,19 +37,19 @@ __constant u8 sigma[256] =
     11, 8,12, 0, 5, 2,15,13,10,14, 3, 6, 7, 1, 9, 4 ,
      7, 9, 3, 1,13,12,11,14, 2, 6, 5,10, 4, 0,15, 8 ,
      9, 0, 5, 7, 2, 4,10,15,14, 1,11,12, 6, 8, 3,13 ,
-     2,12, 6,10, 0,11, 8, 3, 4,13, 7, 5,15,14, 1, 9 
+     2,12, 6,10, 0,11, 8, 3, 4,13, 7, 5,15,14, 1, 9
 };
 
-__constant u64 cst[16] = 
+__constant u64 cst[16] =
 {
   0x243F6A8885A308D3UL,0x13198A2E03707344UL,0xA4093822299F31D0UL,0x082EFA98EC4E6C89UL,
   0x452821E638D01377UL,0xBE5466CF34E90C6CUL,0xC0AC29B7C97C50DDUL,0x3F84D5B5B5470917UL,
   0x9216D5D98979FB1BUL,0xD1310BA698DFB5ACUL,0x2FFD72DBD01ADFB7UL,0xB8E1AFED6A267E96UL,
   0xBA7C9045F12C7F99UL,0x24A19947B3916CF7UL,0x0801F2E2858EFC16UL,0x636920D871574E69UL
 };
-  
-__constant u32 K[64] = 
-{ 
+
+__constant u32 K[64] =
+{
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -74,11 +74,6 @@ uint rotl(uint x, uint y)
 #define R(x) (work[x] = Wr(work[x-2],15,13,10) + work[x-7] + Wr(work[x-15],25,14,3) + work[x-16])
 #define sharound(a,b,c,d,e,f,g,h,x,K) h+=Tr(e,7,21,26)+Ch(e,f,g)+K+x; d+=h; h+=Tr(a,10,19,30)+Ma(a,b,c);
 #define sharound_s(a,b,c,d,e,f,g,h,x) h+=Tr(e,7,21,26)+Ch(e,f,g)+x; d+=h; h+=Tr(a,10,19,30)+Ma(a,b,c);
-
-u32 EndianSwap(u32 n)
-{
-	return ((n&0xFF)<<24) | ((n&0xFF00)<<8) | ((n&0xFF0000)>>8) | ((n&0xFF000000)>>24);
-}
 
 void Sha256_round(u32* s, u8_v* data)
 {
@@ -204,20 +199,25 @@ void Sha256_round_padding(u32* s)
   val[p] = ROT( val[p] ^ val[q],11);				\
   val[u] = ROT( val[u] ^ val[v],11);
 
- 
-  
-  
+
+
+
 //assumes input is 512 bytes
-__kernel void search(__global uchar* in_param, __global uint* out_param, __global uint* pad32) 
+__kernel
+__attribute__((reqd_work_group_size(128, 1, 1)))
+void search(__global uchar* in_param, __global uint* out_param, __global uint* pad32)
 {
 	u8_v in[512];
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<128; ++i)
 		in[i].x = in_param[i];
-		
+
 	uint nonce = get_global_id(0);
-	
-	*(u32*)(in+108) = nonce;
+
+	in[108].x = nonce&0xFF;
+	in[109].x = (nonce>>8)&0xFF;
+	in[110].x = (nonce>>16)&0xFF;
+	in[111].x = (nonce>>24)&0xFF;
 
 	u64 h[8];
 	h[0]=0x6A09E667F3BCC908UL;
@@ -230,7 +230,7 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	h[7]=0x5BE0CD19137E2179UL;
 
 	u64 v[16];
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i< 8;++i)  v[i] = h[i];
 	v[ 8] = 0x243F6A8885A308D3UL;
 	v[ 9] = 0x13198A2E03707344UL;
@@ -242,18 +242,18 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	v[15] = 0x3F84D5B5B5470917UL;
 
 	u64 m[16];
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<16;++i)  m[i] = U8TO64(in + i*8);
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<256; i+=16)
 	{
 		G2( m, v, 0, 4, 8,12, 0, 1, 5, 9,13, 2, 2, 6,10,14, 4, 3, 7,11,15, 6, i);
 		G2( m, v, 3, 4, 9,14,14, 2, 7, 8,13,12, 0, 5,10,15, 8, 1, 6,11,12,10, i);
 	}
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<8;++i)
 	{
-		h[i] ^= v[i]^v[i+8]; 
+		h[i] ^= v[i]^v[i+8];
 		v[i] = h[i];
 	}
 	v[8] = 0x243F6A8885A308D3UL;
@@ -266,14 +266,14 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	v[15] = 0x3F84D5B5B5470917UL;
 
 	u64 m2[16] = {1UL << 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0x400};
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<256; i+=16)
 	{
 		G2( m2, v, 0, 4, 8,12, 0, 1, 5, 9,13, 2, 2, 6,10,14, 4, 3, 7,11,15, 6, i);
 		G2( m2, v, 3, 4, 9,14,14, 2, 7, 8,13,12, 0, 5,10,15, 8, 1, 6,11,12,10, i);
 	}
 
-#pragma unroll
+//#pragma unroll
 	for(uint i=0; i<8;++i)  h[i] ^= v[i]^v[i+8];
 
 	u8_v* work2 = in+128;
@@ -286,7 +286,7 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	U64TO8( work2 +40, h[5]);
 	U64TO8( work2 +48, h[6]);
 	U64TO8( work2 +56, h[7]);
-	
+
 	u8_v* work3 = work2+64;
 //a = x-1, b = x, c = x&63
 #define WORKINIT(a,b,c)   work3[a].x ^= work2[c].x; \
@@ -295,6 +295,7 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 
 
 	work3[0].x = work2[15].x;
+//#pragma unroll
 	for(uint x=1;x<320;++x)
 	{
 		WORKINIT(x-1,x,x&63);
@@ -317,19 +318,19 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	for(u32 x=1;x<nExtra;++x)
 	{
 		qCount += pad32[qCount&PAD_MASK];
-		
-		if(qCount&0x87878700)        
+
+		if(qCount&0x87878700)
 			++work3[qCount%320].x;
-		
+
 		qCount -= (u8)pad32[(qCount+work3[qCount%160].x)&PAD_MASK];
-	
+
 		if (qCount&0x80000000)
 			qCount += (u8)pad32[qCount&0xFFFF];
 		else
 			qCount += pad32[qCount&0x20FAFB];
-		
+
 		qCount += pad32[(qCount+work3[qCount%160].x)&PAD_MASK];
-		if (qCount&0xF0000000) 
+		if (qCount&0xF0000000)
 			++work3[qCount%320].x;
 
 		qCount += pad32[READ_W32((u8)qCount)];
@@ -354,7 +355,7 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	Sha256_round(s, in+384);
 	Sha256_round(s, in+448);
 	Sha256_round_padding(s);
-	
+
 	if ((s[7] & 0x80FFFF) == 0)
 	{
 		out_param[nonce&0xFF] = nonce;

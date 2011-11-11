@@ -1,7 +1,7 @@
 #include "Global.h"
+#include "Blake512.h"
 #include <cstring>
 #include <cstdio>
-#include <cstdint>
 
 #include <iostream>
 using std::cout;

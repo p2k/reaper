@@ -216,6 +216,10 @@ void* LongPollThread(void* param)
 
 	string LP_url = longpoll_url;
 	string LP_path;
+
+	cout << "Long polling URL: [" << LP_url << "]. trying to parse." << endl;
+	clock_t lastcall = 0;
+
 	{//parsing LP address
 		vector<string> exploded = Explode(LP_url, '/');
 		if (exploded.size() >= 2 && exploded[0] == "http:")
@@ -246,6 +250,12 @@ void* LongPollThread(void* param)
 
 	while(!shutdown_now)
 	{
+		clock_t ticks = ticker();
+		if (ticks-lastcall < 5000)
+		{
+			Wait_ms(ticks-lastcall);
+		}
+		lastcall = ticks;
 		p->app->Parse(curl.GetWork_LP(LP_path, 60));
 	}
 	pthread_exit(NULL);
@@ -379,7 +389,7 @@ void App::Main(vector<string> args)
 	Parse(curl.GetWork());
 
 
-	const int work_update_period_ms = 20000;
+	const int work_update_period_ms = 2000;
 
 	pthread_t longpollthread;
 	LongPollThreadParams lp_params;
