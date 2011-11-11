@@ -65,8 +65,11 @@ uint rotl(uint x, uint y)
 	return (x<<y)|(x>>(32-y));
 }
 
-#define Ch(x, y, z) (z ^ (x & (y ^ z)))
-#define Ma(x, y, z) ((y & z) | (x & (y | z)))
+//#define Ch(x, y, z) bitselect(z,y,x)
+//#define Ma(x, y, z) bitselect(z,y,x^z)
+
+#define Ch(x, y, z) (z^(x&(y^z)))
+#define Ma(x, y, z) (z^((x^z)&(y^z)))
 
 #define Tr(x,a,b,c) (rotl(x,a)^rotl(x,b)^rotl(x,c))
 #define Wr(x,a,b,c) (rotl(x,a)^rotl(x,b)^(x>>c))
@@ -290,19 +293,35 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	
 	u8_v* work3 = work2+64;
 //a = x-1, b = x, c = x&63
-#define WORKINIT(a,b,c)   work3[a] ^= work2[c]; \
-		if(work3[a]&0x80) work3[b]=in[(b+work3[a])&0x7F]; \
-		else              work3[b]=work2[(b+work3[a])&0x3F];
 
+#define WORKINIT(x) \
+	if(work3[x-1]&0x80) work3[x]=in[(x+work3[x-1])&0x7F]^work2[x+1];\
+	else              work3[x]=work2[(x+work3[x-1])&0x3F]^work2[x+1];
 
-	work3[0] = work2[15];
+	work3[0] = work2[15]^work2[1];
+	WORKINIT(1);
+	WORKINIT(2);
+	WORKINIT(3);
+	u32 value = ((u32)work3[3]) << 24;
 #pragma unroll
-	for(uint x=1;x<320;++x)
+	for(uint x=4;x<320;x+=4)
 	{
-		WORKINIT(x-1,x,x&63);
+		if(value&0x80000000) value=in[(x+(value>>24))&0x7F]^work2[(x+1)&0x3F];
+		else                 value=work2[(x+(value>>24))&0x3F]^work2[(x+1)&0x3F];
+		if(value&0x00000080) value += ((u32)(in[(x+1+value)&0x7F]^work2[(x+2)&0x3F]))<<8;
+		else                 value += ((u32)(work2[(x+1+value)&0x3F]^work2[(x+2)&0x3F]))<<8;
+		if(value&0x00008000) value += ((u32)(in[(x+2+(value>>8))&0x7F]^work2[(x+3)&0x3F]))<<16;
+		else                 value += ((u32)(work2[(x+2+(value>>8))&0x3F]^work2[(x+3)&0x3F]))<<16;
+		if(value&0x00800000) value += ((u32)(in[(x+3+(value>>16))&0x7F]^work2[(x+4)&0x3F]))<<24;
+		else                 value += ((u32)(work2[(x+3+(value>>16))&0x3F]^work2[(x+4)&0x3F]))<<24;
+		*(u32*)(work3+x) = value;
 	}
+	work3[319] ^= work2[0];
 
 	#define READ_W32(offset) ((u32)work3[offset] + (((u32)work3[(offset)+1])<<8) + (((u32)work3[(offset)+2]&0x3F)<<16))
+
+	#define READ_W32_0(offset) ((u32)*(u16*)(work3+offset) + (((u32)work3[(offset)+2]&0x3F)<<16))
+	#define READ_W32_1(offset) ((u32)work3[offset] + (((u32)((*(u16*)(work3+offset+1))&0x3FFF)<<8)))
 	#define PAD_MASK 0x3FFFFF
 
 	u16* shortptr = (u16*)(work3+310);
@@ -315,38 +334,44 @@ __kernel void search(__global uchar* in_param, __global uint* out_param, __globa
 	for(u32 x=1;x<nExtra;++x)
 	{
 		qCount += pad32[qCount&PAD_MASK];
-		
-		if(qCount&0x87878700)        
+
+		if(qCount&0x87878700)       
 			++work3[qCount%320];
-		
+
 		qCount -= (u8)pad32[(qCount+work3[qCount%160])&PAD_MASK];
-	
+
 		if (qCount&0x80000000)
 			qCount += (u8)pad32[qCount&0xFFFF];
 		else
 			qCount += pad32[qCount&0x20FAFB];
-		
+
 		qCount += pad32[(qCount+work3[qCount%160])&PAD_MASK];
+
 		if (qCount&0xF0000000) 
 			++work3[qCount%320];
+		
+		//optimization that wasnt any faster, so.. not an optimization
+		/*if (qCount&7 < 6)
+			qCount += pad32[(*(u64*)(work3+(qCount&0xF8))>>((qCount&7)*8))&0x3FFFFF];
+		else
+			qCount += pad32[READ_W32((u8)qCount)];*/
 
 		qCount += pad32[READ_W32((u8)qCount)];
 		work3[x%320]=work2[x&63]^((u8)qCount);
 		qCount += pad32[((qCount>>32)+work3[x%200])&PAD_MASK];
 		//this is an ingenious^3 optimization that replaced the previous ingenious one.
 		//this one actually gives like +25% speed. twenty-five percent. dammit.
-		u64 val = ((qCount>>24)&0xFFFFFFFFUL) << ((qCount&3)*8);
 		u32 qCof = (qCount%316)&0x1FC;
 		if (qCof&4)
 		{
-			*(u32*)(work3+qCof) ^= val;
-			*(u32*)(work3+qCof+4) ^= val>>32;
+			*(u32*)(work3+qCof) ^= ((qCount>>24)&0xFFFFFFFFUL) << ((qCount&3)*8);
+			if ((qCount&3) != 0)
+				*(u32*)(work3+qCof+4) ^= (((qCount>>24)&0xFFFFFFFFUL) >> (32-(qCount&3)*8));
 		}
 		else
 		{
-			*(u64*)(work3+qCof) ^= val;
+			*(u64*)(work3+qCof) ^= ((qCount>>24)&0xFFFFFFFFUL) << ((qCount&3)*8);
 		}
-
 		if ((qCount&7) == 3) ++x;
 		qCount -= (u8)pad32[x*x];
 		if ((qCount&7) == 1) ++x;

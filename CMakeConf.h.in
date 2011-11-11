@@ -3,6 +3,5 @@
 
 #define REAPER_VERSION "@REAPER_VERSION@"
 #cmakedefine CPU_MINING_ONLY
-#cmakedefine LONGPOLLING
 
 #endif

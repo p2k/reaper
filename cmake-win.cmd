@@ -20,11 +20,10 @@ xcopy *.cl %builddir%\Release
 xcopy *.conf %builddir%\Release
 xcopy windows\lib\%buildarch%\*.dll %builddir%\Release\
 cd %builddir%
-cmake -G "%buildgen%" -D CMAKE_LIBRARY_ARCHITECTURE=%buildarch% -D "CMAKE_PREFIX_PATH=windows;%AMDAPPSDKROOT%." ..
+cmake -G "%buildgen%" -D CMAKE_LIBRARY_ARCHITECTURE=%buildarch% -D "CMAKE_PREFIX_PATH=windows" ..
 cd ..
 echo.
 goto :eof
 
 :end
 echo All done.
-

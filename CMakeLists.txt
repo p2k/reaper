@@ -4,7 +4,7 @@ project(reaper)
 
 ## Version ##
 
-set(REAPER_VERSION "v11")
+set(REAPER_VERSION "v12")
 
 ## Options ##
 
@@ -61,12 +61,16 @@ set_target_properties(reaper PROPERTIES COMPILE_FLAGS -O2)
 ## OpenCL detection ##
 if(NOT CPU_MINING_ONLY)
     
-    find_library(OPENCL_LIBRARY OpenCL)
+    if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+		find_library(OPENCL_LIBRARY OpenCL PATHS "$ENV{AMDAPPSDKROOT}/lib/x86_64")
+	else( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+		find_library(OPENCL_LIBRARY OpenCL PATHS "$ENV{AMDAPPSDKROOT}/lib/x86")
+	endif( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     
     if(APPLE)
-        find_path(OPENCL_INCLUDE_DIR OpenCL/cl.h)
+        find_path(OPENCL_INCLUDE_DIR OpenCL/cl.h PATHS "$ENV{AMDAPPSDKROOT}/include")
     else(APPLE)
-        find_path(OPENCL_INCLUDE_DIR CL/cl.h)
+        find_path(OPENCL_INCLUDE_DIR CL/cl.h PATHS "$ENV{AMDAPPSDKROOT}/include")
     endif(APPLE)
     
     mark_as_advanced(OPENCL_INCLUDE_DIR OPENCL_LIBRARY)
@@ -93,3 +97,15 @@ if(CPU_MINING_ONLY)
 else(CPU_MINING_ONLY)
     target_link_libraries(reaper ${PTHREAD_LIBRARY} ${CURL_LIBRARY} ${OPENCL_LIBRARY})
 endif(CPU_MINING_ONLY)
+
+## Make MSVC use Runtime Library: "Multithreaded" instead of "Multithreaded DLL"
+
+if(MSVC)
+	foreach(flag_var
+			CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+			CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+		if(${flag_var} MATCHES "/MD")
+			string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+		endif(${flag_var} MATCHES "/MD")
+	endforeach(flag_var)
+endif(MSVC)
